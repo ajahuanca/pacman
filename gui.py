@@ -16,6 +16,54 @@ from persistence import load_q_table, save_q_table
 
 @dataclass
 class StepInfo:
+    """
+    Estructura de datos que almacena el detalle completo de un paso ejecutado
+    por el agente dentro del entorno.
+
+    Esta clase concentra la información necesaria para:
+    - mostrar el cálculo aplicado por Q-Learning,
+    - presentar la transición de estados en la interfaz,
+    - explicar la acción seleccionada y su origen,
+    - exponer métricas de aprendizaje de forma entendible.
+
+    Atributos:
+        prev_state (State):
+            Estado anterior desde el cual parte el agente.
+
+        action (int):
+            Acción ejecutada en formato numérico.
+
+        action_name (str):
+            Nombre descriptivo de la acción ejecutada.
+
+        next_state (State):
+            Estado resultante después de aplicar la acción.
+
+        reward (float):
+            Recompensa o penalización obtenida en la transición.
+
+        done (bool):
+            Indica si el episodio terminó en este paso.
+
+        old_q (float):
+            Valor Q anterior para el par (estado, acción).
+
+        max_next_q (float):
+            Valor máximo esperado en el siguiente estado.
+
+        target (float):
+            Objetivo calculado por la ecuación de Q-Learning.
+
+        new_q (float):
+            Nuevo valor Q aprendido para el par (estado, acción).
+
+        source (str):
+            Origen de la selección de acción, por ejemplo exploración,
+            explotación o demostración codiciosa.
+
+        event (str):
+            Descripción textual del evento ocurrido en el entorno.
+    """
     prev_state: State
     action: int
     action_name: str
@@ -31,6 +79,31 @@ class StepInfo:
 
 
 class PacmanQLearningGUI:
+    """
+    Interfaz gráfica principal del sistema Pac-Man con Q-Learning.
+
+    Esta clase coordina la visualización del tablero, la interacción con el
+    usuario, la ejecución del agente, la actualización de métricas y la
+    persistencia de la tabla Q.
+
+    Responsabilidades principales:
+        - construir y organizar la interfaz gráfica,
+        - renderizar el entorno de entrenamiento,
+        - ejecutar pasos, episodios y ciclos de entrenamiento,
+        - mostrar la fórmula y condiciones de Q-Learning,
+        - administrar el log operativo,
+        - exportar e importar la tabla Q,
+        - generar visualizaciones de convergencia.
+
+    Atributos de clase:
+        CELL_SIZE: Tamaño en píxeles de cada celda del tablero.
+        GRID_PADDING: Espaciado interno alrededor de la grilla.
+        BG: Color de fondo principal de la ventana.
+        PANEL_BG: Color de fondo de tarjetas y paneles.
+        DARK: Color principal de texto oscuro.
+        MUTED: Color secundario para textos descriptivos.
+    """
+
     CELL_SIZE = 72
     GRID_PADDING = 20
     BG = "#f4f7fb"
@@ -39,6 +112,25 @@ class PacmanQLearningGUI:
     MUTED = "#6b7280"
 
     def __init__(self, root: tk.Tk) -> None:
+        """
+        Inicializa la ventana principal y todos los componentes del sistema.
+        Args:
+            root (tk.Tk):
+                Instancia raíz de Tkinter sobre la cual se monta la interfaz.
+        Returns:
+            None
+        Propósito:
+            Configurar el entorno visual, crear los objetos principales
+            del dominio (configuración, entorno, agente y métricas) y
+            preparar el estado inicial de la aplicación.
+        Flujo:
+            1. Configura la ventana principal.
+            2. Inicializa configuración, entorno, agente y métricas.
+            3. Inicializa variables de control del episodio actual.
+            4. Construye estilos y layout.
+            5. Dibuja el tablero inicial.
+            6. Refresca los paneles informativos.
+        """
         self.root = root
         self.root.title("Pac-Man Q-Learning")
         self.root.geometry("1460x920")
@@ -61,6 +153,18 @@ class PacmanQLearningGUI:
         self._refresh_panels(initial=True)
 
     def _build_styles(self) -> None:
+        """
+        Configura los estilos visuales reutilizables de la interfaz.
+        Returns:
+            None
+        Propósito:
+            Centralizar la apariencia de tarjetas, etiquetas y botones
+            utilizando estilos de ttk para mantener una presentación
+            uniforme, limpia y profesional.
+        Nota:
+            Si el tema "clam" no está disponible, la aplicación continúa
+            usando el tema por defecto sin interrumpir la ejecución.
+        """
         style = ttk.Style()
         try:
             style.theme_use("clam")
@@ -76,6 +180,21 @@ class PacmanQLearningGUI:
         style.configure("Secondary.TButton", font=("Segoe UI", 10))
 
     def _build_layout(self) -> None:
+        """
+        Construye la estructura visual completa de la interfaz.
+        Returns:
+            None
+        Propósito:
+            Definir la distribución de paneles, tablero, botones, métricas,
+            log y secciones de explicación para la interacción con el sistema.
+        Componentes principales creados:
+            - panel izquierdo con título, tablero y acciones,
+            - panel derecho con resumen, condiciones, fórmula, métricas,
+              log y valores Q del estado actual.
+        Nota:
+            Este método además inicializa referencias a widgets clave que
+            luego son reutilizados por otros métodos para actualizar el contenido.
+        """
         self.root.columnconfigure(0, weight=3)
         self.root.columnconfigure(1, weight=4)
         self.root.rowconfigure(0, weight=1)
@@ -93,7 +212,7 @@ class PacmanQLearningGUI:
         ttk.Label(left, text="Pac-Man con Q-Learning", style="Title.TLabel").grid(row=0, column=0, sticky="w")
         ttk.Label(
             left,
-            text="Versión modular con paredes, múltiples obstáculos, persistencia JSON, métricas y convergencia.\nEdwin Ajahuanca Callisaya",
+            text="Versión modular con paredes, múltiples obstáculos, persistencia JSON, métricas y convergencia.\nPor: Edwin Ajahuanca Callisaya",
             style="Subtitle.TLabel",
         ).grid(row=1, column=0, sticky="w", pady=(0, 10))
 
@@ -160,6 +279,21 @@ class PacmanQLearningGUI:
         self.q_content.grid(row=0, column=0, sticky="w")
 
     def _cell_to_xy(self, row: int, col: int) -> tuple[int, int, int, int]:
+        """
+        Convierte coordenadas de grilla en coordenadas de dibujo sobre el canvas.
+        Args:
+            row (int):
+                Fila de la celda.
+            col (int):
+                Columna de la celda.
+        Returns:
+            tuple[int, int, int, int]:
+                Coordenadas del rectángulo delimitador de la celda
+                en formato (x1, y1, x2, y2).
+        Propósito:
+            Traducir posiciones lógicas del tablero a posiciones físicas
+            dentro del canvas para su representación gráfica.
+        """
         x1 = self.GRID_PADDING + col * self.CELL_SIZE
         y1 = self.GRID_PADDING + row * self.CELL_SIZE
         x2 = x1 + self.CELL_SIZE
@@ -167,6 +301,24 @@ class PacmanQLearningGUI:
         return x1, y1, x2, y2
 
     def _draw_grid(self) -> None:
+        """
+        Renderiza gráficamente el tablero completo y sus elementos.
+        Returns:
+            None
+        Propósito:
+            Dibujar el estado visual actual del entorno, incluyendo:
+            - celdas base,
+            - muros,
+            - objetivo,
+            - obstáculos,
+            - posición actual del agente.
+        Flujo:
+            1. Limpia el canvas.
+            2. Dibuja todas las celdas del tablero.
+            3. Dibuja la comida.
+            4. Dibuja las trampas u obstáculos.
+            5. Dibuja al agente en su posición actual.
+        """
         self.canvas.delete("all")
 
         for r in range(self.config.rows):
@@ -194,17 +346,56 @@ class PacmanQLearningGUI:
         self.canvas.create_text((x1 + x2) // 2, y2 - 10, text="Pac-Man", fill="#1e40af", font=("Segoe UI", 8, "bold"))
 
     def log(self, message: str) -> None:
+        """
+        Agrega un mensaje al panel de log de la interfaz.
+        Args:
+            message (str):
+                Texto a registrar en el log visual.
+        Returns:
+            None
+        Propósito:
+            Mantener trazabilidad de eventos, decisiones y resultados del
+            proceso de aprendizaje en tiempo real.
+        """
         self.log_text.configure(state="normal")
         self.log_text.insert("end", message + "\n")
         self.log_text.see("end")
         self.log_text.configure(state="disabled")
 
     def clear_log(self) -> None:
+        """
+        Limpia el contenido completo del log visual.
+        Returns:
+            None
+        Propósito:
+            Reiniciar el historial de mensajes mostrados en pantalla sin
+            afectar el estado interno del agente ni del entorno.
+        """
         self.log_text.configure(state="normal")
         self.log_text.delete("1.0", "end")
         self.log_text.configure(state="disabled")
 
     def _refresh_panels(self, initial: bool = False) -> None:
+        """
+        Actualiza todos los paneles informativos de la interfaz.
+        Args:
+            initial (bool, optional):
+                Indica si la actualización corresponde al estado inicial
+                de un episodio. En ese caso, se muestra una explicación
+                base en lugar de una fórmula aplicada a un paso previo.
+        Returns:
+            None
+        Propósito:
+            Reflejar en tiempo real el estado operativo del sistema, mostrando:
+            - resumen del episodio,
+            - parámetros de Q-Learning,
+            - métricas acumuladas,
+            - valores Q del estado actual,
+            - desglose de la última actualización aplicada.
+        Nota:
+            Si no existe un último paso registrado, se presenta una
+            explicación introductoria del estado inicial.
+        """
         state = self.env.agent_pos
         q_values = self.agent.get_all_q_for_state(state)
         best_action = self.agent.best_action(state)
@@ -235,7 +426,6 @@ class PacmanQLearningGUI:
         )
 
         self.metrics_content.config(text=self.metrics.summary())
-
         self.q_content.config(
             text=(
                 f"Estado actual: {state}\n"
@@ -277,6 +467,29 @@ class PacmanQLearningGUI:
         )
 
     def _do_step(self, greedy_only: bool = False) -> bool:
+        """
+        Ejecuta un paso completo del agente dentro del entorno.
+        Args:
+            greedy_only (bool, optional):
+                Si es True, fuerza al agente a usar únicamente la mejor
+                acción conocida en cada estado. Si es False, utiliza la
+                política ε-greedy normal.
+        Returns:
+            bool:
+                True si el episodio terminó en este paso o alcanzó el
+                límite máximo de pasos; False en caso contrario.
+        Propósito:
+            Orquestar un ciclo completo de interacción:
+            - obtener el estado actual,
+            - seleccionar acción,
+            - ejecutar transición en el entorno,
+            - actualizar la tabla Q,
+            - registrar métricas y logs,
+            - refrescar la interfaz,
+            - cerrar episodio si corresponde.
+        Nota:
+            Este método es uno de los núcleos operativos de la aplicación.
+        """
         state = self.env.agent_pos
 
         if greedy_only:
@@ -336,6 +549,22 @@ class PacmanQLearningGUI:
         return False
 
     def _finish_episode(self) -> None:
+        """
+        Finaliza el episodio actual y prepara el siguiente.
+        Returns:
+            None
+        Propósito:
+            Reiniciar el estado temporal de ejecución del episodio, aumentar
+            el contador de episodios, reposicionar al agente y refrescar la
+            interfaz para comenzar una nueva iteración.
+        Acciones realizadas:
+            - registra separador visual en el log,
+            - incrementa el número de episodio,
+            - reinicia contador de pasos y recompensa acumulada,
+            - limpia la última información de fórmula,
+            - reinicia la posición del agente,
+            - vuelve a dibujar y actualizar paneles.
+        """
         self.log("=" * 100)
         self.episode += 1
         self.step_count = 0
@@ -346,14 +575,51 @@ class PacmanQLearningGUI:
         self._refresh_panels(initial=True)
 
     def step_once(self) -> None:
+        """
+        Ejecuta un único paso del agente.
+        Returns:
+            None
+        Propósito:
+            Permitir una interacción manual y controlada paso a paso,
+            útil para observación, depuración y demostración del algoritmo.
+        """
         self._do_step()
 
     def run_one_episode(self) -> None:
+        """
+        Ejecuta automáticamente un episodio completo hasta su finalización.
+        Returns:
+            None
+        Propósito:
+            Procesar de forma continua las acciones del agente hasta que:
+            - alcance el objetivo,
+            - caiga en una trampa,
+            - o llegue al límite máximo de pasos.
+        """
         finished = False
         while not finished:
             finished = self._do_step()
 
     def train_many(self, episodes: int) -> None:
+        """
+        Ejecuta múltiples episodios de entrenamiento sin visualización paso a paso.
+        Args:
+            episodes (int):
+                Número de episodios de entrenamiento a ejecutar.
+        Returns:
+            None
+        Propósito:
+            Acelerar el aprendizaje del agente mediante iteraciones masivas,
+            actualizando la tabla Q y las métricas sin sobrecargar la interfaz
+            con el detalle de cada paso.
+        Flujo:
+            1. Guarda métricas previas de victorias y caídas.
+            2. Ejecuta la cantidad solicitada de episodios.
+            3. En cada episodio, recorre pasos hasta terminar o llegar al límite.
+            4. Registra métricas por episodio.
+            5. Reinicia el estado visual al finalizar.
+            6. Informa resultados agregados en el log.
+        """
         wins_before = self.metrics.wins
         traps_before = self.metrics.trap_hits
 
@@ -393,14 +659,46 @@ class PacmanQLearningGUI:
         self.log("=" * 100)
 
     def auto_slow_episode(self) -> None:
+        """
+        Inicia la ejecución automática lenta de un episodio.
+        Returns:
+            None
+        Propósito:
+            Permitir observar visualmente el proceso de decisión y aprendizaje
+            del agente a una velocidad controlada mediante temporización.
+        """
         self._auto_loop()
 
     def _auto_loop(self) -> None:
+        """
+        Ejecuta el ciclo automático temporizado de un episodio.
+        Returns:
+            None
+        Propósito:
+            Continuar la ejecución del episodio paso a paso con un retardo
+            fijo entre iteraciones, manteniendo la interfaz responsiva.
+        Nota:
+            Usa `root.after` para programar el siguiente paso sin bloquear
+            el hilo principal de la interfaz.
+        """
         finished = self._do_step()
         if not finished:
             self.root.after(450, self._auto_loop)
 
     def show_greedy_demo(self) -> None:
+        """
+        Inicia una demostración utilizando únicamente la política aprendida.
+        Returns:
+            None
+        Propósito:
+            Mostrar cómo se comporta el agente cuando ya no explora y solo
+            ejecuta la mejor acción conocida en cada estado.
+        Flujo:
+            - registra mensaje informativo en log,
+            - reinicia posición y contadores del episodio,
+            - actualiza la interfaz,
+            - inicia el ciclo de demostración codiciosa.
+        """
         self.log("[Demostración] Se ejecutará solo la mejor acción conocida por estado.")
         self.env.reset()
         self.step_count = 0
@@ -411,11 +709,27 @@ class PacmanQLearningGUI:
         self._greedy_loop()
 
     def _greedy_loop(self) -> None:
+        """
+        Ejecuta el ciclo temporizado de demostración con política codiciosa.
+        Returns:
+            None
+        Propósito:
+            Repetir pasos usando únicamente explotación del conocimiento
+            aprendido, con retardo visual entre cada transición.
+        """
         finished = self._do_step(greedy_only=True)
         if not finished:
             self.root.after(450, self._greedy_loop)
 
     def reset_position_only(self) -> None:
+        """
+        Reinicia únicamente la posición del agente y el estado temporal del episodio.
+        Returns:
+            None
+        Propósito:
+            Permitir comenzar una nueva trayectoria desde una posición válida
+            aleatoria sin borrar la tabla Q ni las métricas históricas.
+        """
         self.env.reset()
         self.step_count = 0
         self.total_reward = 0.0
@@ -425,6 +739,19 @@ class PacmanQLearningGUI:
         self.log(f"[Reset posición] Nuevo estado inicial = {self.env.agent_pos}")
 
     def reset_all(self) -> None:
+        """
+        Reinicia completamente el aprendizaje y la ejecución.
+        Returns:
+            None
+        Propósito:
+            Restaurar el sistema a un estado limpio, eliminando:
+            - tabla Q aprendida,
+            - métricas acumuladas,
+            - estado actual del episodio,
+            - historial visual del log.
+        Uso típico:
+            Reinicio total de la simulación para nuevas pruebas o experimentos.
+        """
         self.agent.reset_q_table()
         self.metrics.reset()
         self.episode = 1
@@ -438,6 +765,21 @@ class PacmanQLearningGUI:
         self.log("[Reset total] Tabla Q, métricas y ejecución reiniciadas.")
 
     def save_q_json(self) -> None:
+        """
+        Guarda la tabla Q actual en un archivo JSON seleccionado por el usuario.
+        Returns:
+            None
+        Propósito:
+            Persistir el aprendizaje del agente para reutilizarlo en futuras
+            ejecuciones sin necesidad de reentrenar desde cero.
+        Flujo:
+            1. Solicita al usuario una ruta de destino.
+            2. Si se selecciona una ruta, guarda la tabla Q.
+            3. Registra el resultado en el log y muestra mensaje visual.
+            4. Si ocurre error, informa mediante cuadro de diálogo.
+        Observación:
+            La validación y serialización real dependen del módulo `persistence`.
+        """
         filepath = filedialog.asksaveasfilename(
             title="Guardar tabla Q",
             defaultextension=".json",
@@ -454,6 +796,19 @@ class PacmanQLearningGUI:
             messagebox.showerror("Error", f"No se pudo guardar la tabla Q.\n\n{exc}")
 
     def load_q_json(self) -> None:
+        """
+        Carga una tabla Q desde un archivo JSON seleccionado por el usuario.
+        Returns:
+            None
+        Propósito:
+            Restaurar un estado de aprendizaje previamente guardado y continuar
+            desde ese conocimiento acumulado.
+        Flujo:
+            1. Solicita al usuario un archivo JSON.
+            2. Si se selecciona, carga la tabla Q en el agente.
+            3. Refresca la interfaz para reflejar los nuevos valores.
+            4. Registra el resultado o informa errores al usuario.
+        """
         filepath = filedialog.askopenfilename(
             title="Cargar tabla Q",
             filetypes=[("JSON", "*.json")],
@@ -470,6 +825,19 @@ class PacmanQLearningGUI:
             messagebox.showerror("Error", f"No se pudo cargar la tabla Q.\n\n{exc}")
 
     def export_convergence_chart(self) -> None:
+        """
+        Exporta un gráfico de convergencia de métricas a un archivo PNG.
+        Returns:
+            None
+        Propósito:
+            Generar una evidencia visual del comportamiento de entrenamiento
+            del agente, útil para análisis, documentación y presentación
+            de resultados.
+        Flujo:
+            1. Solicita una ruta de salida al usuario.
+            2. Genera el gráfico usando el componente de métricas.
+            3. Informa éxito o error mediante log y cuadros de diálogo.
+        """
         filepath = filedialog.asksaveasfilename(
             title="Guardar gráfico de convergencia",
             defaultextension=".png",
